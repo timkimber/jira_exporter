@@ -1,0 +1,9 @@
+[project]
+name = "jira-exporter"
+version = "0.1.0"
+description = "Python app that uses the JIRA API to export JIRA in markdown format"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "jira>=3.10.5",
+]
