@@ -1,5 +1,5 @@
 JIRA = {
     "server": "https://example.com/jira/",
     "user": "user",
-    "password": "password"
+    "token": "your_api_token",
 }
