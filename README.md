@@ -18,11 +18,15 @@ Features:
 
 1. Clone this project
 1. cd into the project
-1. `virtualenv venv`
-1. `. venv/scripts/activate`
-1. `pip install --requirement=requirements.txt`
+1. Using venv:
+    1. `virtualenv venv`
+    1. `. venv/scripts/activate`
+    1. `pip install --requirement=requirements.txt`
+1. Using uv
+    1. `uv sync`
 1. EDIT `jiraconfig.py` (you can use jiraconfig-sample.py as example)
 1. Call `./export-jira.py list_projects` to test your settings are working (this will print available projects)
+    1. or `uv run ./export-jira.py list_projects`
 
 JIRA server configuration is picked up from `jiraconfig.py`.
 
