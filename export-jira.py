@@ -3,10 +3,15 @@
 from __future__ import print_function
 
 import sys
+import io
 import pprint
 import argparse
 import inspect
 from jira.client import JIRA
+
+# Ensure UTF-8 encoding for stdout when redirecting to file on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", newline="\n")
 
 from lib import subissues
 
