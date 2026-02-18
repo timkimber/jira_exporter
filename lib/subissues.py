@@ -5,7 +5,7 @@ import re
 
 
 _HEADING_RE = re.compile(r"^h([1-6])\.\s+(.*)$")
-_CODE_RE = re.compile(r"^\{code(?::([^}]+))?\}\s*$")
+_CODE_RE = re.compile(r"^\{code(?::([^}]+))?\}|\{code\}\s*$")
 _QUOTE_RE = re.compile(r"^\{quote\}\s*$")
 _PANEL_RE = re.compile(r"^\{panel(?::([^}]+))?\}\s*$")
 
@@ -102,7 +102,7 @@ def _jira_wiki_to_markdown(text):
     for line in text.splitlines():
         stripped = line.strip()
 
-        code_match = _CODE_RE.match(stripped)
+        code_match = _CODE_RE.search(stripped)
         if code_match:
             if in_code:
                 output.append("```")
