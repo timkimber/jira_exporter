@@ -6,7 +6,7 @@ import re
 
 _HEADING_RE = re.compile(r"^h([1-6])\.\s+(.*)$")
 _CODE_RE = re.compile(r"^\{code(?::([^}]+))?\}|\{code\}\s*$")
-_QUOTE_RE = re.compile(r"^\{quote\}\s*$")
+_QUOTE_RE = re.compile(r"^\{quote\}|\{quote\}\s*$")
 _PANEL_RE = re.compile(r"^\{panel(?::([^}]+))?\}\s*$")
 
 
@@ -105,17 +105,38 @@ def _jira_wiki_to_markdown(text):
         code_match = _CODE_RE.search(stripped)
         if code_match:
             if in_code:
+                if stripped.endswith("{code}"):
+                    content_before = stripped[:-7].strip()
+                    if content_before:
+                        output.append(content_before)
                 output.append("```")
                 in_code = False
             else:
                 lang = code_match.group(1) or ""
                 output.append("```" + lang.strip())
+                if stripped.startswith("{code"):
+                    content_after = stripped[stripped.find("}") + 1 :].strip()
+                    if content_after:
+                        output.append(content_after)
                 in_code = True
             continue
 
         if not in_code:
-            if _QUOTE_RE.match(stripped):
-                in_quote = not in_quote
+            quote_match = _QUOTE_RE.search(stripped)
+            if quote_match:
+                if stripped.startswith("{quote}") and stripped.endswith("{quote}"):
+                    inline_quote_content = stripped[7:-7].strip()
+                    output.append("> " + _convert_inline(inline_quote_content))
+                elif stripped.startswith("{quote}"):
+                    in_quote = not in_quote
+                    content_after = stripped[7:].strip()
+                    if content_after:
+                        output.append("> " + _convert_inline(content_after))
+                elif stripped.endswith("{quote}"):
+                    content_before = stripped[:-7].strip()
+                    if content_before:
+                        output.append("> " + _convert_inline(content_before))
+                    in_quote = not in_quote
                 continue
 
             panel_match = _PANEL_RE.match(stripped)
@@ -175,28 +196,52 @@ def _jira_wiki_to_markdown(text):
     return "\n".join(output)
 
 
+def _write_issue_to_file(jira, issue, export_dir):
+    content = _to_string(jira, issue)
+    output_path = os.path.join(export_dir, "{0}.md".format(issue.key))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write(content)
+
+
+def _write_raw_jira_to_file(jira, issue, input_dir):
+    output_path = os.path.join(input_dir, "{0}.txt".format(issue.key))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        if issue.fields.description:
+            handle.write(issue.fields.description)
+        comments = jira.comments(issue)
+        if comments:
+            handle.write("\n\n---\n\n# COMMENTS:\n\n")
+            for comment in comments:
+                handle.write(
+                    "by: " + str(comment.author) + " on " + str(comment.created) + "\n"
+                )
+                handle.write(comment.body + "\n\n")
+
+
 def list_epics_stories_and_tasks(jira, query):
     print("---\nSource: Jira Exporter\nJQL: " + query + "\n---\n\n")
-    result = []
-    export_dir = "epic_texts"
+    export_dir = "output"
     os.makedirs(export_dir, exist_ok=True)
+
+    input_dir = "input"
+    os.makedirs(input_dir, exist_ok=True)
+
     epics = jira.search_issues(
         query, maxResults=500, fields="issuetype,summary,description,status"
     )
     for epic in epics:
-        if epic.fields.description:
-            epic_path = os.path.join(export_dir, "{0}.txt".format(epic.key))
-            with open(epic_path, "w", encoding="utf-8") as handle:
-                handle.write(epic.fields.description)
-        result.append(_to_string(jira, epic))
+        _write_raw_jira_to_file(jira, epic, input_dir)
+        _write_issue_to_file(jira, epic, export_dir)
         stories = jira.search_issues('"Epic Link" = %s' % epic.key)
         for story in stories:
-            result.append(_to_string(jira, story, 1))
+            _write_raw_jira_to_file(jira, story, input_dir)
+            _write_issue_to_file(jira, story, export_dir)
             tasks = jira.search_issues("parent = %s" % story.key)
             for task in tasks:
-                result.append(_to_string(jira, task, 2))
+                _write_raw_jira_to_file(jira, task, input_dir)
+                _write_issue_to_file(jira, task, export_dir)
 
-    return "\n\n---\n\n".join(result)
+    return ""
 
 
 def _to_string(jira, issue, level=0):
