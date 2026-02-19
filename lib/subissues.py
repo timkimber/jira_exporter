@@ -171,7 +171,7 @@ def _jira_wiki_to_markdown(text):
                     ("#" * level) + " " + _convert_inline(heading_match.group(2))
                 ]
             else:
-                list_match = re.match(r"^([*#]+)\s*(.*)$", stripped)
+                list_match = re.match(r"^([*#]+)\s+(.*)$", stripped)
                 if list_match:
                     markers = list_match.group(1)
                     item_text = list_match.group(2)
