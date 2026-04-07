@@ -90,7 +90,7 @@ def _table_row_to_markdown(line, header, allow_inline):
     return "| " + " | ".join(cells) + " |", len(cells)
 
 
-def _jira_wiki_to_markdown(text):
+def _jira_wiki_to_markdown(jira, text, issue_key):
     if not text:
         return ""
 
@@ -99,7 +99,48 @@ def _jira_wiki_to_markdown(text):
     in_quote = False
     in_panel = False
 
+    # Image handling logic
+    # Regex for !image.png! or !image.png|thumbnail!
+    _IMAGE_RE = re.compile(r"!([^|!]+)(?:\|([^!]+))?!")
+
+    def _download_and_replace_image(match):
+        filename = match.group(1)
+        # Assuming filename is the identifier in JIRA attachments for simplicity,
+        # or it might be a full URL. For JIRA attachments, usually it is just the filename.
+        # This will need enhancement to handle different URL formats if necessary.
+
+        # Ensure images directory exists
+        images_dir = os.path.join("output", "images")
+        os.makedirs(images_dir, exist_ok=True)
+
+        # Prevent filename collisions between tickets by prefixing
+        local_filename = f"{issue_key}_{filename}"
+        local_path = os.path.join(images_dir, local_filename)
+
+        # Download if not already downloaded
+        if not os.path.exists(local_path):
+            try:
+                # Find the attachment in the issue
+                attachment = next(
+                    (
+                        a
+                        for a in jira.issue(issue_key).fields.attachment
+                        if a.filename == filename
+                    ),
+                    None,
+                )
+                if attachment:
+                    with open(local_path, "wb") as f:
+                        f.write(attachment.get())
+            except Exception as e:
+                print(f"Failed to download image {filename}: {e}")
+                return match.group(0)  # Fallback to original
+
+        return f"![{filename}](images/{local_filename})"
+
     for line in text.splitlines():
+        # ... (rest of the original logic, with image replacement applied)
+        line = _IMAGE_RE.sub(_download_and_replace_image, line)
         stripped = line.strip()
 
         code_match = _CODE_RE.search(stripped)
@@ -250,7 +291,7 @@ def _to_string(jira, issue, level=0):
     # if (issue.fields.issuetype.name =='Sub-task' or issue.fields.issuetype.name =='Task'):
     if issue.fields.description:
         result += "\n"
-        description = _jira_wiki_to_markdown(issue.fields.description)
+        description = _jira_wiki_to_markdown(jira, issue.fields.description, issue.key)
         lines = description.splitlines()
         result += "  \n"
         result += "  \n".join(line for line in lines)
@@ -269,7 +310,7 @@ def _to_string(jira, issue, level=0):
                 + str(comment.created)
                 + "\n"
             )
-            body = _jira_wiki_to_markdown(comment.body)
+            body = _jira_wiki_to_markdown(jira, comment.body, issue.key)
             lines = body.splitlines()
             result += "  \n".join(line for line in lines) + "\n"
 
