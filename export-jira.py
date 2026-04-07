@@ -90,14 +90,16 @@ def _get_command():
 
     if len(sys.argv) < 2:
         print_help_and_exit()
+
     command_name = sys.argv[1]
-    if not command_name[0].isalpha():
-        print_help_and_exit()
-    if command_name not in globals():
-        print("Invalid command: {0}\n".format(command_name), file=sys.stderr)
-        print_help_and_exit()
-    command = globals()[command_name]
-    return command_name, command
+
+    # If it's a function, use it as the command
+    if command_name in globals() and inspect.isfunction(globals()[command_name]):
+        return command_name, globals()[command_name]
+
+    # Otherwise, assume it's a JQL query and use export_from_jql
+    sys.argv.insert(1, "export_from_jql")
+    return "export_from_jql", export_from_jql
 
 
 def _list_local_commands():
