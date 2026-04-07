@@ -2,5 +2,6 @@
 *.swp
 jiraconfig.py
 venv/
-*.MD
+*.md
 input/
+output/

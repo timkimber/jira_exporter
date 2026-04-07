@@ -259,9 +259,8 @@ def _write_raw_jira_to_file(jira, issue, input_dir):
                 handle.write(comment.body + "\n\n")
 
 
-def list_epics_stories_and_tasks(jira, query):
+def list_epics_stories_and_tasks(jira, query, export_dir="output"):
     print("---\nSource: Jira Exporter\nJQL: " + query + "\n---\n\n")
-    export_dir = "output"
     os.makedirs(export_dir, exist_ok=True)
 
     input_dir = "input"

@@ -25,6 +25,9 @@ import jiraconfig as conf
 
 def _make_jql_argument_parser(parser):
     parser.add_argument("jql", help="the JQL query used in the command")
+    parser.add_argument(
+        "-o", "--output-dir", default="output", help="the directory to export files to"
+    )
     return parser
 
 
@@ -47,7 +50,7 @@ def list_fields(jira, args):
 def export_from_jql(jira, args):
     """Prints a Markdown-compatible tree of epics,
     stories, subtasks, bugs, issues that match the given JQL query"""
-    results = subissues.list_epics_stories_and_tasks(jira, args.jql)
+    results = subissues.list_epics_stories_and_tasks(jira, args.jql, args.output_dir)
     print(results)
 
 
