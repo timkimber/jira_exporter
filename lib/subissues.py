@@ -244,6 +244,46 @@ def _write_issue_to_file(jira, issue, export_dir):
         handle.write(content)
 
 
+def _write_raw_jira_to_file(jira, issue, input_dir):
+    output_path = os.path.join(input_dir, "{0}.txt".format(issue.key))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        if issue.fields.description:
+            handle.write(issue.fields.description)
+        comments = jira.comments(issue)
+        if comments:
+            handle.write("\n\n---\n\n# COMMENTS:\n\n")
+            for comment in comments:
+                handle.write(
+                    "by: " + str(comment.author) + " on " + str(comment.created) + "\n"
+                )
+                handle.write(comment.body + "\n\n")
+
+
+def list_epics_stories_and_tasks(jira, query, export_dir="output"):
+    print("---\nSource: Jira Exporter\nJQL: " + query + "\n---\n\n")
+    os.makedirs(export_dir, exist_ok=True)
+
+    input_dir = "input"
+    os.makedirs(input_dir, exist_ok=True)
+
+    epics = jira.search_issues(
+        query, maxResults=500, fields="issuetype,summary,description,status"
+    )
+    for epic in epics:
+        _write_raw_jira_to_file(jira, epic, input_dir)
+        _write_issue_to_file(jira, epic, export_dir)
+        stories = jira.search_issues('"Epic Link" = %s' % epic.key)
+        for story in stories:
+            _write_raw_jira_to_file(jira, story, input_dir)
+            _write_issue_to_file(jira, story, export_dir)
+            tasks = jira.search_issues("parent = %s" % story.key)
+            for task in tasks:
+                _write_raw_jira_to_file(jira, task, input_dir)
+                _write_issue_to_file(jira, task, export_dir)
+
+    return ""
+
+
 def _to_string(jira, issue, export_dir, level=0):
     # result = '{0}* {1.key} ({1.fields.status}): {1.fields.summary}'
     result = "# " + issue.key + ": " + _convert_inline(issue.fields.summary)
