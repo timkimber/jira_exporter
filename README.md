@@ -43,12 +43,28 @@ Here's the default help:
 
     positional arguments:
      command   the command to run, available commands:
-               'export_from_jql': prints a Markdown-compatible tree of epics, stories, subtasks, bugs, issues that match the given JQL query
+               'export_from_jql': Prints a Markdown-compatible tree of epics,
+                   stories, subtasks, bugs, issues that match the given JQL query
+                   jql: the JQL query used in the command
+                   -o, --output-dir: the directory to export files to (default: output)
                'list_fields': List available JIRA field names and IDs
                'list_projects': List available JIRA projects
-               
+                
     optional arguments:
       -h, --help  show this help message and exit
+
+### `export_from_jql` arguments
+
+    usage: export-jira.py export_from_jql [-h] [-o OUTPUT_DIR] jql
+
+    positional arguments:
+      jql                    the JQL query used in the command
+
+    optional arguments:
+      -h, --help             show this help message and exit
+      -o, --output-dir       the directory to export files to (default: output)
+
+Note: if the command is not recognised, it is assumed to be a JQL query and `export_from_jql` is used automatically. For example, `./export-jira.py 'project = PROJ'` is equivalent to `./export-jira.py export_from_jql 'project = PROJ'`.
 
 ## Examples
 
@@ -56,3 +72,6 @@ Here's the default help:
     ./export-jira.py export_from_jql 'project = PROJ and sprint in openSprints() and status = Closed' > PROJ.MD
 
     ./export-jira.py export_from_jql 'project = PROJ and type = Epic' > PROJ2.MD
+
+    # export Project PROJ to a custom output directory
+    ./export-jira.py export_from_jql 'project = PROJ' -o /path/to/output

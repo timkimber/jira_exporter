@@ -81,6 +81,9 @@ def _make_main_argument_parser():
         help="R|the command to run, available "
         + "commands:\n{0}".format(_list_local_commands()),
     )
+    parser.add_argument(
+        "-o", "--output-dir", default="output", help="the directory to export files to"
+    )
     return parser
 
 
@@ -91,7 +94,7 @@ def _get_command():
         argparser.print_help()
         sys.exit(1)
 
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print_help_and_exit()
 
     command_name = sys.argv[1]
