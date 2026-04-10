@@ -8,6 +8,7 @@ import pprint
 import argparse
 import inspect
 from jira.client import JIRA
+from jira.exceptions import JIRAError
 
 # Ensure UTF-8 encoding for stdout when redirecting to file on Windows
 if sys.platform == "win32":
@@ -68,7 +69,11 @@ def _main():
         },  # add 'verify': False if HTTPS cert is untrusted
         basic_auth=(conf.JIRA["user"], conf.JIRA["token"]),
     )
-    command(jira, args)
+    try:
+        command(jira, args)
+    except JIRAError as e:
+        print("JIRA error: " + e.text, file=sys.stderr)
+        sys.exit(1)
 
 
 # helpers
