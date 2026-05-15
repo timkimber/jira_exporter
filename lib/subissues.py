@@ -132,6 +132,7 @@ def _jira_wiki_to_markdown(jira, text, issue_key, export_dir):
                 if attachment:
                     with open(local_path, "wb") as f:
                         f.write(attachment.get())
+                        print(f'Created: {local_path}')
             except Exception as e:
                 print(f"Failed to download image {filename}: {e}")
                 return match.group(0)  # Fallback to original
@@ -242,6 +243,7 @@ def _write_issue_to_file(jira, issue, export_dir):
     output_path = os.path.join(export_dir, "{0}.md".format(issue.key))
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write(content)
+    print(f"Created: {output_path}")
 
 
 def _write_raw_jira_to_file(jira, issue, input_dir):
@@ -257,10 +259,10 @@ def _write_raw_jira_to_file(jira, issue, input_dir):
                     "by: " + str(comment.author) + " on " + str(comment.created) + "\n"
                 )
                 handle.write(comment.body + "\n\n")
+    print(f"Created: {output_path}")
 
 
 def list_epics_stories_and_tasks(jira, query, export_dir="output"):
-    print("---\nSource: Jira Exporter\nJQL: " + query + "\n---\n\n")
     os.makedirs(export_dir, exist_ok=True)
 
     input_dir = "input"
@@ -269,6 +271,8 @@ def list_epics_stories_and_tasks(jira, query, export_dir="output"):
     epics = jira.search_issues(
         query, maxResults=500, fields="issuetype,summary,description,status"
     )
+    if len(epics) == 0:
+        print(f'No jiras found for {query}')
     for epic in epics:
         _write_raw_jira_to_file(jira, epic, input_dir)
         _write_issue_to_file(jira, epic, export_dir)
