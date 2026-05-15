@@ -8,6 +8,8 @@ _HEADING_RE = re.compile(r"^h([1-6])\.\s+(.*)$")
 _CODE_RE = re.compile(r"^\{code(?::([^}]+))?\}|\{code\}\s*$")
 _QUOTE_RE = re.compile(r"^\{quote\}|\{quote\}\s*$")
 _PANEL_RE = re.compile(r"^\{panel(?::([^}]+))?\}\s*$")
+# Regex for !image.png! or !image.png|thumbnail
+_IMAGE_RE = re.compile(r"!([^|!]+)(?:\|([^!]+))?!")
 
 
 def _extract_panel_title(params):
@@ -90,18 +92,10 @@ def _table_row_to_markdown(line, header, allow_inline):
     return "| " + " | ".join(cells) + " |", len(cells)
 
 
-def _jira_wiki_to_markdown(jira, text, issue_key, export_dir):
+# Image handling logic
+def _replace_images_in_text(jira, text, issue_key, export_dir):
     if not text:
-        return ""
-
-    output = []
-    in_code = False
-    in_quote = False
-    in_panel = False
-
-    # Image handling logic
-    # Regex for !image.png! or !image.png|thumbnail!
-    _IMAGE_RE = re.compile(r"!([^|!]+)(?:\|([^!]+))?!")
+        return text
 
     def _download_and_replace_image(match):
         filename = match.group(1)
@@ -139,9 +133,20 @@ def _jira_wiki_to_markdown(jira, text, issue_key, export_dir):
 
         return f"![{filename}](images/{local_filename})"
 
+    return _IMAGE_RE.sub(_download_and_replace_image, text)
+
+
+def _jira_wiki_to_markdown(text):
+
+    if not text:
+        return ""
+
+    output = []
+    in_code = False
+    in_quote = False
+    in_panel = False
+
     for line in text.splitlines():
-        # ... (rest of the original logic, with image replacement applied)
-        line = _IMAGE_RE.sub(_download_and_replace_image, line)
         stripped = line.strip()
 
         code_match = _CODE_RE.search(stripped)
@@ -294,9 +299,10 @@ def _to_string(jira, issue, export_dir, level=0):
     # if (issue.fields.issuetype.name =='Sub-task' or issue.fields.issuetype.name =='Task'):
     if issue.fields.description:
         result += "\n"
-        description = _jira_wiki_to_markdown(
+        description = _replace_images_in_text(
             jira, issue.fields.description, issue.key, export_dir
         )
+        description = _jira_wiki_to_markdown(description)
         lines = description.splitlines()
         result += "  \n"
         result += "  \n".join(line for line in lines)
@@ -315,7 +321,10 @@ def _to_string(jira, issue, export_dir, level=0):
                 + str(comment.created)
                 + "\n"
             )
-            body = _jira_wiki_to_markdown(jira, comment.body, issue.key, export_dir)
+            body = _replace_images_in_text(
+                jira, comment.body, issue.key, export_dir
+            )
+            body = _jira_wiki_to_markdown(body)
             lines = body.splitlines()
             result += "  \n".join(line for line in lines) + "\n"
 
