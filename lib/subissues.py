@@ -29,6 +29,7 @@ def _convert_inline(text):
     text = re.sub(r"\{\{(.*?)\}\}", r"`\1`", text)
     text = re.sub(r"\*([^*\n]+)\*", r"**\1**", text)
     # text = re.sub(r"_([^_\n]+)_", r"*\1*", text)
+    text = text.replace("<", "\\<")  # escape '<' to avoid Markdown treating it as HTML
 
     def _link_with_text(match):
         return "[{0}]({1})".format(match.group(1), match.group(2))
@@ -109,12 +110,13 @@ def _replace_images_in_text(jira, text, issue_key, export_dir):
 
     def _download_and_replace_image(match):
         filename = match.group(1).strip()
+        local_filename = f"{issue_key}_{filename}"
 
         # Ensure images directory exists
         images_dir = os.path.join(export_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
 
-        local_path = os.path.join(images_dir, filename)
+        local_path = os.path.join(images_dir, local_filename)
 
         # Download if not already downloaded
         if not os.path.exists(local_path):
@@ -134,11 +136,22 @@ def _replace_images_in_text(jira, text, issue_key, export_dir):
                         print(f'Created: {local_path}')
             except Exception as e:
                 print(f"Failed to download image {filename}: {e}")
-                return match.group(0)  # Fallback to original
 
-        return f"![[images/{filename}]]"
+        return f"![[images/{local_filename}]]"
 
-    return _IMAGE_RE.sub(_download_and_replace_image, text)
+    # Process line by line so we skip code blocks
+    result_lines = []
+    in_code = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _CODE_RE.search(stripped):
+            in_code = not in_code
+            result_lines.append(line)
+        elif in_code:
+            result_lines.append(line)
+        else:
+            result_lines.append(_IMAGE_RE.sub(_download_and_replace_image, line))
+    return "\n".join(result_lines)
 
 
 def _jira_wiki_to_markdown(text):
