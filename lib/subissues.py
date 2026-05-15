@@ -2,15 +2,15 @@ from __future__ import unicode_literals
 
 import os
 import re
+from datetime import datetime
 
 
 _HEADING_RE = re.compile(r"^h([1-6])\.\s+(.*)$")
 _CODE_RE = re.compile(r"^\{code(?::([^}]+))?\}|\{code\}\s*$")
 _QUOTE_RE = re.compile(r"^\{quote\}|\{quote\}\s*$")
 _PANEL_RE = re.compile(r"^\{panel(?::([^}]+))?\}\s*$")
-# Regex for !image.png! or !image.png|thumbnail
-_IMAGE_RE = re.compile(r"!([^|!]+)(?:\|([^!]+))?!")
-
+# Regex for !image.png! or !image.png|params!  (excludes ![[...]] Obsidian syntax)
+_IMAGE_RE = re.compile(r"!(?!\[\[)([^|!\n]+)(?:\|([^!\n]+))?!")
 
 def _extract_panel_title(params):
     if not params:
@@ -60,6 +60,16 @@ def _escape_remaining_left_brackets(text):
             index += 1
             continue
 
+        # Skip Obsidian-style image links: ![[...]]
+        # At first '[': check if preceded by '!' and followed by '['
+        if (index >= 1 and text[index - 1] == "!"
+                and index + 1 < length and text[index + 1] == "["):
+            # Emit both '[' characters unescaped
+            result.append("[")
+            result.append("[")
+            index += 2
+            continue
+
         close_index = text.find("]", index + 1)
         if close_index != -1 and close_index + 1 < length:
             if text[close_index + 1] == "(":
@@ -98,18 +108,13 @@ def _replace_images_in_text(jira, text, issue_key, export_dir):
         return text
 
     def _download_and_replace_image(match):
-        filename = match.group(1)
-        # Assuming filename is the identifier in JIRA attachments for simplicity,
-        # or it might be a full URL. For JIRA attachments, usually it is just the filename.
-        # This will need enhancement to handle different URL formats if necessary.
+        filename = match.group(1).strip()
 
         # Ensure images directory exists
         images_dir = os.path.join(export_dir, "images")
         os.makedirs(images_dir, exist_ok=True)
 
-        # Prevent filename collisions between tickets by prefixing
-        local_filename = f"{issue_key}_{filename}"
-        local_path = os.path.join(images_dir, local_filename)
+        local_path = os.path.join(images_dir, filename)
 
         # Download if not already downloaded
         if not os.path.exists(local_path):
@@ -131,7 +136,7 @@ def _replace_images_in_text(jira, text, issue_key, export_dir):
                 print(f"Failed to download image {filename}: {e}")
                 return match.group(0)  # Fallback to original
 
-        return f"![{filename}](images/{local_filename})"
+        return f"![[images/{filename}]]"
 
     return _IMAGE_RE.sub(_download_and_replace_image, text)
 
@@ -145,6 +150,8 @@ def _jira_wiki_to_markdown(text):
     in_code = False
     in_quote = False
     in_panel = False
+    # Track ordered list counters per depth (1-based depth)
+    ordered_counters = {}
 
     for line in text.splitlines():
         stripped = line.strip()
@@ -217,16 +224,37 @@ def _jira_wiki_to_markdown(text):
                 converted_lines = [
                     ("#" * level) + " " + _convert_inline(heading_match.group(2))
                 ]
+            elif stripped == "----":
+                converted_lines = ["---"]
             else:
                 list_match = re.match(r"^([*#]+)\s+(.*)$", stripped)
                 if list_match:
                     markers = list_match.group(1)
                     item_text = list_match.group(2)
-                    indent = "  " * (len(markers) - 1)
-                    marker = "- " if markers[0] == "*" else "1. "
+                    depth = len(markers)
+                    indent = "    " * (depth - 1)
+                    # Use the outermost (first) marker to determine list type
+                    outermost = markers[0]
+                    if outermost == "#":
+                        # Increment counter for this depth, reset deeper levels
+                        ordered_counters[depth] = ordered_counters.get(depth, 0) + 1
+                        for d in list(ordered_counters.keys()):
+                            if d > depth:
+                                del ordered_counters[d]
+                        num = ordered_counters[depth]
+                        marker = f"{num}. "
+                    else:
+                        # Bullet list resets ordered counters at this depth and deeper
+                        for d in list(ordered_counters.keys()):
+                            if d >= depth:
+                                del ordered_counters[d]
+                        marker = "- "
                     converted_lines = [indent + marker + _convert_inline(item_text)]
                 else:
-                    converted_lines = [_convert_inline(line)]
+                    # Reset ordered counters when leaving list context (blank or non-list line)
+                    if not stripped:
+                        ordered_counters.clear()
+                    converted_lines = [_convert_inline(line.rstrip())]
 
         if in_quote or in_panel:
             prefix = "> "
@@ -294,18 +322,19 @@ def list_epics_stories_and_tasks(jira, query, export_dir="output"):
 
 
 def _to_string(jira, issue, export_dir, level=0):
-    # result = '{0}* {1.key} ({1.fields.status}): {1.fields.summary}'
-    result = "# " + issue.key + ": " + _convert_inline(issue.fields.summary)
-    # if (issue.fields.issuetype.name =='Sub-task' or issue.fields.issuetype.name =='Task'):
+    # Build YAML frontmatter with today's date (export date)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    result = "---\nCreated: {0}\n---\n".format(today)
+    result += "# " + issue.key + ": " + _convert_inline(issue.fields.summary)
+
     if issue.fields.description:
         result += "\n"
         description = _replace_images_in_text(
             jira, issue.fields.description, issue.key, export_dir
         )
         description = _jira_wiki_to_markdown(description)
-        lines = description.splitlines()
-        result += "  \n"
-        result += "  \n".join(line for line in lines)
+        result += "\n" + description + "\n"
 
     comments = jira.comments(issue)
     if comments:
@@ -326,6 +355,6 @@ def _to_string(jira, issue, export_dir, level=0):
             )
             body = _jira_wiki_to_markdown(body)
             lines = body.splitlines()
-            result += "  \n".join(line for line in lines) + "\n"
+            result += "\n".join(line for line in lines) + "\n"
 
     return result
