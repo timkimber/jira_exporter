@@ -286,7 +286,7 @@ def _jira_wiki_to_markdown(text):
 
 def _write_issue_to_file(jira, issue, export_dir):
     content = _to_string(jira, issue, export_dir)
-    output_path = os.path.join(export_dir, "{0}.md".format(issue.key))
+    output_path = os.path.join(export_dir, "{0} {1}.md".format(issue.key, _convert_inline(issue.fields.summary)))
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write(content)
     print(f"Created: {output_path}")
@@ -339,7 +339,7 @@ def _to_string(jira, issue, export_dir, level=0):
     today = datetime.now().strftime("%Y-%m-%d")
 
     result = "---\nCreated: {0}\n---\n".format(today)
-    result += "# " + issue.key + ": " + _convert_inline(issue.fields.summary)
+    result += "# User Story"
 
     if issue.fields.description:
         result += "\n"
