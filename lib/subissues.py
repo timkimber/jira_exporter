@@ -286,7 +286,11 @@ def _jira_wiki_to_markdown(text):
 
 def _write_issue_to_file(jira, issue, export_dir):
     content = _to_string(jira, issue, export_dir)
-    output_path = os.path.join(export_dir, "{0} {1}.md".format(issue.key, _convert_inline(issue.fields.summary)))
+    # Replace brackets with parentheses in the filename
+    title = _convert_inline(issue.fields.summary) or ""
+    safe_title = title.replace("[", "(").replace("]", ")")
+    filename = "{0} {1}.md".format(issue.key, safe_title)
+    output_path = os.path.join(export_dir, filename)
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write(content)
     print(f"Created: {output_path}")
